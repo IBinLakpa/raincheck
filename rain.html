@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rainfall Data</title>
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  
+  <!-- jQuery and Bootstrap Datepicker -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <link rel="stylesheet" href="https://www.dhm.gov.np/assets/vendors/bootstrap_datepicker/dist/css/bootstrap-datepicker.min.css">
+  <script src="https://www.dhm.gov.np/assets/vendors/bootstrap_datepicker/dist/js/bootstrap-datepicker.min.js"></script>
+
+  <style>
+    /* Custom styles for form */
+    .form-container {
+      max-width: 600px;
+      margin: 50px auto;
+      background-color: #f7f7f7;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .form-title {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .submit-btn {
+      background-color: #007bff;
+      border-color: #007bff;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <div class="container form-container">
+    <h2 class="form-title">Rainfall Data Form</h2>
+    <form action="https://www.dhm.gov.np/site/getRiverWatchBySeriesId" class="form-group" id="rainfallForm" method="POST" accept-charset="utf-8">
+      <!-- Datepicker input -->
+      <div class="form-group">
+        <label for="date">Select Date:</label>
+        <input type="text" class="form-control datePicker" name="date" id="date" placeholder="yyyy-mm-dd" required>
+      </div>
+
+      <!-- Hidden input -->
+      <input type="hidden" name="period" value="1">
+
+      <!-- Number input for Series ID -->
+      <div class="form-group">
+        <label for="seriesid">Series ID:</label>
+        <input type="number" class="form-control" name="seriesid" id="seriesid" placeholder="Enter Series ID" required>
+      </div>
+
+      <!-- Submit button -->
+      <button type="submit" class="btn btn-primary btn-block submit-btn">Submit</button>
+    </form>
+
+    <!-- Output Div -->
+    <div id="output" class="mt-4"></div>
+  </div>
+
+  <script>
+    $(document).ready(function () {
+      // Initialize date picker
+      $('.datePicker').datepicker({
+        format: "yyyy-mm-dd",
+        autoclose: true
+      });
+
+      // Form submission with AJAX
+      $('#rainfallForm').on('submit', function (e) {
+        e.preventDefault();
+        var data = $(this).serialize();
+
+        $.ajax({
+          type: 'POST',
+          url: 'https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId', // Example URL
+          data: data,
+          success: function (response) {
+            $('#output').html('<p>Data submitted successfully!</p>');
+            console.log(JSON.parse(response).data.table);
+          },
+          error: function () {
+            $('#output').html('<p>Failed to submit data.</p>');
+          }
+        });
+      });
+    });
+  </script>
+
+</body>
+
+</html>
