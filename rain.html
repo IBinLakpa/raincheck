@@ -40,14 +40,20 @@
 
   <div class="container form-container">
     <h2 class="form-title">Rainfall Data Form</h2>
-    <form action="https://www.dhm.gov.np/site/getRiverWatchBySeriesId" class="form-group" id="rainfallForm" method="POST" accept-charset="utf-8">
-      <!-- Datepicker input -->
+
+    <form id="rainfallForm" method="POST">
+      <!-- Datepicker inputs for "from" and "to" dates -->
       <div class="form-group">
-        <label for="date">Select Date:</label>
-        <input type="text" class="form-control datePicker" name="date" id="date" placeholder="yyyy-mm-dd" required>
+        <label for="date_from">From Date:</label>
+        <input type="text" class="form-control datePicker" name="date_from" id="date_from" placeholder="yyyy-mm-dd" required>
       </div>
 
-      <!-- Hidden input -->
+      <div class="form-group">
+        <label for="date_to">To Date:</label>
+        <input type="text" class="form-control datePicker" name="date_to" id="date_to" placeholder="yyyy-mm-dd" required>
+      </div>
+
+      <!-- Hidden input for period -->
       <input type="hidden" name="period" value="1">
 
       <!-- Number input for Series ID -->
@@ -61,6 +67,8 @@
     </form>
 
     <!-- Output Div -->
+  </div>
+  <div class="container form-container">
     <div id="output" class="mt-4"></div>
   </div>
 
@@ -72,22 +80,55 @@
         autoclose: true
       });
 
+      // Function to handle date iteration
+      function getDatesInRange(startDate, endDate) {
+        var dates = [];
+        var currentDate = new Date(startDate);
+
+        while (currentDate <= new Date(endDate)) {
+          dates.push(currentDate.toISOString().split('T')[0]); // Format the date as yyyy-mm-dd
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        return dates;
+      }
+
       // Form submission with AJAX
       $('#rainfallForm').on('submit', function (e) {
         e.preventDefault();
-        var data = $(this).serialize();
 
-        $.ajax({
-          type: 'POST',
-          url: 'https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId', // Example URL
-          data: data,
-          success: function (response) {
-            $('#output').html('<p>Data submitted successfully!</p>');
-            console.log(JSON.parse(response).data.table);
-          },
-          error: function () {
-            $('#output').html('<p>Failed to submit data.</p>');
-          }
+        var seriesid = $('#seriesid').val();
+        var dateFrom = $('#date_from').val();
+        var dateTo = $('#date_to').val();
+
+        if (new Date(dateFrom) > new Date(dateTo)) {
+          $('#output').html('<p>Invalid date range. "From Date" cannot be after "To Date".</p>');
+          return;
+        }
+
+        var dates = getDatesInRange(dateFrom, dateTo);
+
+        // Iterate through the dates and make AJAX requests for each one
+        dates.forEach(function (date) {
+          var data = {
+            date: date,
+            period: 1,
+            seriesid: seriesid
+          };
+
+          $.ajax({
+            type: 'POST',
+            url: 'https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId', // Example URL
+            data: data,
+            success: function (response) {
+              // Append the results to the output div for each date
+              $('#output').append('<p>Data for ' + date + ':</p>');
+              $('#output').append('<pre>' + JSON.parse(response).data.table + '</pre>');
+            },
+            error: function () {
+              $('#output').append('<p>Failed to retrieve data for ' + date + '.</p>');
+            }
+          });
         });
       });
     });
