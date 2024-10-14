@@ -53,13 +53,12 @@
         <input type="text" class="form-control datePicker" name="date_to" id="date_to" placeholder="yyyy-mm-dd" required>
       </div>
 
-      <!-- Hidden input for period -->
-      <input type="hidden" name="period" value="1">
-
-      <!-- Number input for Series ID -->
+      <!-- Station Select dropdown for Series ID -->
       <div class="form-group">
-        <label for="seriesid">Series ID:</label>
-        <input type="number" class="form-control" name="seriesid" id="seriesid" placeholder="Enter Series ID" required>
+        <label for="station">Select Station:</label>
+        <select class="form-control" id="station" name="seriesid" required>
+          <option value="">Loading stations...</option>
+        </select>
       </div>
 
       <!-- Submit button -->
@@ -67,8 +66,6 @@
     </form>
 
     <!-- Output Div -->
-  </div>
-  <div class="container form-container">
     <div id="output" class="mt-4"></div>
   </div>
 
@@ -80,30 +77,65 @@
         autoclose: true
       });
 
-      // Function to handle date iteration
-      function getDatesInRange(startDate, endDate) {
-        var dates = [];
-        var currentDate = new Date(startDate);
+      // Fetch station data and populate the select dropdown
+    function loadStations() {
+        $.ajax({
+            url: 'https://www.dhm.gov.np/frontend_dhm/hydrology/getRainfallFilter',
+            type: 'GET',
+            dataType: 'json',
+            success: function (response) {
+                var stationSelect = $('#station');
+                stationSelect.empty(); // Clear the previous options
 
-        while (currentDate <= new Date(endDate)) {
-          dates.push(currentDate.toISOString().split('T')[0]); // Format the date as yyyy-mm-dd
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
+                // Check if data exists and populate the dropdown
+                if (response && response.status === "success" && Array.isArray(response.data[0])) {
+                    stationSelect.append('<option value="">Select a station</option>'); // Default option
+                    $.each(response.data[0], function (index, station) {
+                        // Append the station name as the option text and series_id as the option value
+                        stationSelect.append('<option value="' + station.series_id + '">' + station.name + '</option>');
+                    });
+                } else {
+                    stationSelect.append('<option value="">No stations available</option>');
+                }
+            },
+            error: function () {
+                $('#station').html('<option value="">Failed to load stations</option>');
+            }
+        });
+    }
 
-        return dates;
-      }
+      // Load stations on page load
+      loadStations();
 
       // Form submission with AJAX
       $('#rainfallForm').on('submit', function (e) {
         e.preventDefault();
 
-        var seriesid = $('#seriesid').val();
+        var seriesid = $('#station').val();
         var dateFrom = $('#date_from').val();
         var dateTo = $('#date_to').val();
+
+        if (!seriesid) {
+          $('#output').html('<p>Please select a station.</p>');
+          return;
+        }
 
         if (new Date(dateFrom) > new Date(dateTo)) {
           $('#output').html('<p>Invalid date range. "From Date" cannot be after "To Date".</p>');
           return;
+        }
+
+        // Dates for range (like previous code)
+        function getDatesInRange(startDate, endDate) {
+          var dates = [];
+          var currentDate = new Date(startDate);
+
+          while (currentDate <= new Date(endDate)) {
+            dates.push(currentDate.toISOString().split('T')[0]); // Format the date as yyyy-mm-dd
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+
+          return dates;
         }
 
         var dates = getDatesInRange(dateFrom, dateTo);
@@ -121,7 +153,6 @@
             url: 'https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId', // Example URL
             data: data,
             success: function (response) {
-              // Append the results to the output div for each date
               $('#output').append('<p>Data for ' + date + ':</p>');
               $('#output').append('<pre>' + JSON.parse(response).data.table + '</pre>');
             },
