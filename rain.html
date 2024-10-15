@@ -53,6 +53,14 @@
         <input type="text" class="form-control datePicker" name="date_to" id="date_to" placeholder="yyyy-mm-dd" required>
       </div>
 
+      <!-- Basin Select dropdown -->
+      <div class="form-group">
+        <label for="basin">Select Basin:</label>
+        <select class="form-control" id="basin" name="basin">
+          <option value="">All Basins</option>
+        </select>
+      </div>
+
       <!-- Station Select dropdown for Series ID -->
       <div class="form-group">
         <label for="station">Select Station:</label>
@@ -77,34 +85,61 @@
         autoclose: true
       });
 
-      // Fetch station data and populate the select dropdown
-    function loadStations() {
+      // Fetch station data and populate the basin and station select dropdowns
+      function loadStations() {
         $.ajax({
-            url: 'https://www.dhm.gov.np/frontend_dhm/hydrology/getRainfallFilter',
-            type: 'GET',
-            dataType: 'json',
-            success: function (response) {
-                var stationSelect = $('#station');
-                stationSelect.empty(); // Clear the previous options
+          url: 'https://www.dhm.gov.np/frontend_dhm/hydrology/getRainfallFilter',
+          type: 'GET',
+          dataType: 'json',
+          success: function (response) {
+            var basinSelect = $('#basin');
+            var stationSelect = $('#station');
+            var stations = response.data[0];  // Assuming data is in response.data[0]
 
-                // Check if data exists and populate the dropdown
-                if (response && response.status === "success" && Array.isArray(response.data[0])) {
-                    stationSelect.append('<option value="">Select a station</option>'); // Default option
-                    $.each(response.data[0], function (index, station) {
-                        // Append the station name as the option text and series_id as the option value
-                        stationSelect.append('<option value="' + station.series_id + '">' + station.name + '</option>');
-                    });
-                } else {
-                    stationSelect.append('<option value="">No stations available</option>');
-                }
-            },
-            error: function () {
-                $('#station').html('<option value="">Failed to load stations</option>');
+            // Find unique basins
+            var basins = [...new Set(stations.map(station => station.basin))];
+
+            // Populate basin dropdown with unique basins
+            basinSelect.empty();
+            basinSelect.append('<option value="">All Basins</option>');
+            basins.forEach(function (basin) {
+              basinSelect.append('<option value="' + basin + '">' + basin + '</option>');
+            });
+
+            // Function to populate all stations
+            function populateStations(stationsList) {
+              stationSelect.empty();
+              stationSelect.append('<option value="">Select a station</option>');
+              stationsList.forEach(function (station) {
+                stationSelect.append('<option value="' + station.series_id + '">' + station.name + '</option>');
+              });
             }
-        });
-    }
 
-      // Load stations on page load
+            // Initially populate with all stations
+            populateStations(stations);
+
+            // When a basin is selected, filter stations based on the selected basin
+            basinSelect.on('change', function () {
+              var selectedBasin = $(this).val();
+
+              if (selectedBasin) {
+                // Filter stations belonging to the selected basin
+                var filteredStations = stations.filter(station => station.basin === selectedBasin);
+                populateStations(filteredStations);
+              } else {
+                // Show all stations if no basin is selected
+                populateStations(stations);
+              }
+            });
+          },
+          error: function () {
+            $('#basin').html('<option value="">Failed to load basins</option>');
+            $('#station').html('<option value="">Failed to load stations</option>');
+          }
+        });
+      }
+
+      // Load stations and basins on page load
       loadStations();
 
       // Form submission with AJAX
