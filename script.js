@@ -78,7 +78,7 @@ $(document).ready(function() {
             return;
         }
 
-        // Dates for range (like previous code)
+        // Dates for range
         function getDatesInRange(startDate, endDate) {
             var dates = [];
             var currentDate = new Date(startDate);
@@ -101,20 +101,24 @@ $(document).ready(function() {
 
         // Check if "All Stations" is selected
         if (selectedStation === "all") {
-            // All stations selected - iterate over stations first, then dates
-            $('#station option').each(function() {
-                var stationId = $(this).val();
-                var stationName = $(this).text();
+            // Collect data for each date and all stations
+            dates.forEach(function(date) {
+                $('#station option').each(function() {
+                    var stationId = $(this).val();
+                    var stationName = $(this).text();
 
-                if (stationId !== "all") { // Exclude "All Stations" option
-                    // Collect data for this station
-                    requests.push(collectDataForStation(stationId, stationName, dates, allCsvData));
-                }
+                    if (stationId !== "all") { // Exclude "All Stations" option
+                        // Collect data for this station and date
+                        requests.push(collectDataForStation(stationId, stationName, date, allCsvData));
+                    }
+                });
             });
         } else {
-            // Single station selected
+            // Single station selected, iterate through all dates
             var stationName = $('#station option:selected').text();
-            requests.push(collectDataForStation(selectedStation, stationName, dates, allCsvData));
+            dates.forEach(function(date) {
+                requests.push(collectDataForStation(selectedStation, stationName, date, allCsvData));
+            });
         }
 
         // Wait for all requests to complete
@@ -130,67 +134,51 @@ $(document).ready(function() {
     });
 
     // Function to collect data for each station and date
-    function collectDataForStation(stationId, stationName, dates, allCsvData) {
+    function collectDataForStation(stationId, stationName, date, allCsvData) {
         return new Promise((resolve, reject) => {
-            let requestsCompleted = 0; // Count of completed requests
+            var data = {
+                date: date,
+                period: 1,
+                seriesid: stationId
+            };
 
-            dates.forEach(function(date) {
-                var data = {
-                    date: date,
-                    period: 1,
-                    seriesid: stationId
-                };
+            $.ajax({
+                type: 'POST',
+                url: 'https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId', // Example URL
+                data: data,
+                success: function(response) {
+                    // Parse the response and extract the table HTML
+                    let tableHTML = JSON.parse(response).data.table;
 
-                $.ajax({
-                    type: 'POST',
-                    url: 'https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId', // Example URL
-                    data: data,
-                    success: function(response) {
-                        // Parse the response and extract the table HTML
-                        let tableHTML = JSON.parse(response).data.table;
+                    // Create a temporary DOM element to manipulate the HTML content
+                    let tempDiv = $('<div>').html(tableHTML);
 
-                        // Create a temporary DOM element to manipulate the HTML content
-                        let tempDiv = $('<div>').html(tableHTML);
+                    // Find each table row and extract the date and point
+                    tempDiv.find('tbody tr').each(function() {
+                        let dateText = $(this).find('td').eq(0).text().trim(); // Get the date text
+                        let point = $(this).find('td').eq(1).text().trim(); // Get the point value
 
-                        // Find each table row and extract the date and point
-                        tempDiv.find('tbody tr').each(function() {
-                            let dateText = $(this).find('td').eq(0).text().trim(); // Get the date text
-                            let point = $(this).find('td').eq(1).text().trim(); // Get the point value
+                        // Convert the date to the desired format ddmmyyyy,hhmm
+                        let dateObj = new Date(dateText);
+                        let day = ("0" + dateObj.getDate()).slice(-2);
+                        let month = ("0" + (dateObj.getMonth() + 1)).slice(-2);
+                        let year = dateObj.getFullYear();
+                        let hours = ("0" + dateObj.getHours()).slice(-2);
+                        let minutes = ("0" + dateObj.getMinutes()).slice(-2);
 
-                            // Convert the date to the desired format ddmmyyyy,hhmm
-                            let dateObj = new Date(dateText);
-                            let day = ("0" + dateObj.getDate()).slice(-2);
-                            let month = ("0" + (dateObj.getMonth() + 1)).slice(-2);
-                            let year = dateObj.getFullYear();
-                            let hours = ("0" + dateObj.getHours()).slice(-2);
-                            let minutes = ("0" + dateObj.getMinutes()).slice(-2);
+                        // Create the formatted date string
+                        let formattedDate = `${day}${month}${year},${hours}${minutes}`;
 
-                            // Create the formatted date string
-                            let formattedDate = `${day}${month}${year},${hours}${minutes}`;
+                        // Push the formatted data into the allCsvData array
+                        allCsvData.push(`${formattedDate},${point}`);
+                    });
 
-                            // Push the formatted data into the allCsvData array
-                            allCsvData.push(`${formattedDate},${point}`);
-                        });
-
-                        // Count completed requests
-                        requestsCompleted++;
-
-                        // Check if all requests for this station are completed
-                        if (requestsCompleted === dates.length) {
-                            resolve(); // Resolve the promise
-                        }
-                    },
-
-                    error: function() {
-                        $('#output').append('<p>Failed to retrieve data for ' + stationName + ' station on ' + date + '.</p>');
-                        requestsCompleted++; // Count as completed even on error
-
-                        // Check if all requests for this station are completed
-                        if (requestsCompleted === dates.length) {
-                            resolve(); // Resolve the promise even if there are errors
-                        }
-                    }
-                });
+                    resolve(); // Resolve the promise after data is processed
+                },
+                error: function() {
+                    $('#output').append('<p>Failed to retrieve data for ' + stationName + ' station on ' + date + '.</p>');
+                    resolve(); // Resolve the promise even on error
+                }
             });
         });
     }
