@@ -5,6 +5,29 @@ $(document).ready(function() {
         autoclose: true
     });
 
+    // Function to get the current date in GMT+5:45
+    function getNepalTime(offsetMinutes) {
+        let now = new Date();
+        let localTime = now.getTime();
+        let localOffset = now.getTimezoneOffset() * 60000; // Get local time offset in milliseconds
+        let utc = localTime + localOffset; // Get UTC time in milliseconds
+
+        // Calculate time for GMT+5:45 (345 minutes)
+        let nepalTime = new Date(utc + (offsetMinutes * 60000));
+
+        // Format the date as yyyy-mm-dd
+        let year = nepalTime.getFullYear();
+        let month = ("0" + (nepalTime.getMonth() + 1)).slice(-2); // Months are 0-indexed
+        let day = ("0" + nepalTime.getDate()).slice(-2);
+
+        return `${year}-${month}-${day}`;
+    }
+
+    // Set the default value for "From Date" and "To Date"
+    let nepalTimeToday = getNepalTime(345); // Nepal's GMT offset is +5:45 (345 minutes)
+    $('#date_from').val(nepalTimeToday);
+    $('#date_to').val(nepalTimeToday);
+    
     // Fetch station data and populate the basin and station select dropdowns
     function loadStations() {
         $.ajax({
