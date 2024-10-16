@@ -65,7 +65,7 @@
       <div class="form-group">
         <label for="station">Select Station:</label>
         <select class="form-control" id="station" name="seriesid" required>
-          <option value="">Loading stations...</option>
+          <option value="all">All Stations</option>
         </select>
       </div>
 
@@ -109,7 +109,7 @@
             // Function to populate all stations
             function populateStations(stationsList) {
               stationSelect.empty();
-              stationSelect.append('<option value="">Select a station</option>');
+              stationSelect.append('<option value="all">All Stations</option>');
               stationsList.forEach(function (station) {
                 stationSelect.append('<option value="' + station.series_id + '">' + station.name + '</option>');
               });
@@ -146,14 +146,12 @@
       $('#rainfallForm').on('submit', function (e) {
         e.preventDefault();
 
-        var seriesid = $('#station').val();
+        var selectedStation = $('#station').val();
         var dateFrom = $('#date_from').val();
         var dateTo = $('#date_to').val();
 
-        if (!seriesid) {
-          $('#output').html('<p>Please select a station.</p>');
-          return;
-        }
+        // Clear the output before new requests
+        $('#output').html('');
 
         if (new Date(dateFrom) > new Date(dateTo)) {
           $('#output').html('<p>Invalid date range. "From Date" cannot be after "To Date".</p>');
@@ -175,12 +173,31 @@
 
         var dates = getDatesInRange(dateFrom, dateTo);
 
-        // Iterate through the dates and make AJAX requests for each one
+        // Check if "All Stations" is selected
+        if (selectedStation === "all") {
+          // All stations selected - iterate over stations first, then dates
+          $('#station option').each(function () {
+            var stationId = $(this).val();
+            var stationName = $(this).text();
+
+            if (stationId !== "all") {  // Exclude "All Stations" option
+              submitForStationAndDates(stationId, stationName, dates);
+            }
+          });
+        } else {
+          // Single station selected
+          var stationName = $('#station option:selected').text();
+          submitForStationAndDates(selectedStation, stationName, dates);
+        }
+      });
+
+      // Function to submit data for each station and date
+      function submitForStationAndDates(stationId, stationName, dates) {
         dates.forEach(function (date) {
           var data = {
             date: date,
             period: 1,
-            seriesid: seriesid
+            seriesid: stationId
           };
 
           $.ajax({
@@ -188,15 +205,15 @@
             url: 'https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId', // Example URL
             data: data,
             success: function (response) {
-              $('#output').append('<p>Data for ' + date + ':</p>');
+              $('#output').append('<p>Data for ' + stationName + ' station on ' + date + ':</p>');
               $('#output').append('<pre>' + JSON.parse(response).data.table + '</pre>');
             },
             error: function () {
-              $('#output').append('<p>Failed to retrieve data for ' + date + '.</p>');
+              $('#output').append('<p>Failed to retrieve data for ' + stationName + ' station on ' + date + '.</p>');
             }
           });
         });
-      });
+      }
     });
   </script>
 
