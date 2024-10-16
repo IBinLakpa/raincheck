@@ -1,2 +1,2 @@
 # raincheck
-rainfall data
+Gets rainfall data
