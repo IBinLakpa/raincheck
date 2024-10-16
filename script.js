@@ -62,6 +62,9 @@ $(document).ready(function() {
     // Load stations and basins on page load
     loadStations();
 
+    // Initialize a global array to hold all CSV data
+    let allCsvData = [];
+
     // Form submission with AJAX
     $('#rainfallForm').on('submit', function(e) {
         e.preventDefault();
@@ -72,6 +75,7 @@ $(document).ready(function() {
 
         // Clear the output before new requests
         $('#output').html('');
+        allCsvData = []; // Reset CSV data on each form submission
 
         if (new Date(dateFrom) > new Date(dateTo)) {
             $('#output').html('<p>Invalid date range. "From Date" cannot be after "To Date".</p>');
@@ -93,11 +97,12 @@ $(document).ready(function() {
 
         var dates = getDatesInRange(dateFrom, dateTo);
 
-        // Initialize a global array to hold all CSV data
-        let allCsvData = [];
-
         // Create an array to hold all AJAX request promises
         let requests = [];
+
+        // Show the spinner and hide the download button
+        $('#spinner').show();
+        $('#downloadButton').hide();
 
         // Check if "All Stations" is selected
         if (selectedStation === "all") {
@@ -124,12 +129,16 @@ $(document).ready(function() {
         // Wait for all requests to complete
         Promise.all(requests)
             .then(() => {
-                // Trigger CSV download after all requests are completed
-                triggerCsvDownload(allCsvData);
+                // Show the download button after all requests are completed
+                $('#downloadButton').show();
             })
             .catch(error => {
                 $('#output').append('<p>Some data retrieval failed. Please check the log.</p>');
                 console.error('Error fetching data:', error);
+            })
+            .finally(() => {
+                // Hide the spinner
+                $('#spinner').hide();
             });
     });
 
@@ -184,6 +193,10 @@ $(document).ready(function() {
     }
 
     // Function to trigger CSV download
+    $('#downloadButton').on('click', function() {
+        triggerCsvDownload(allCsvData);
+    });
+
     function triggerCsvDownload(allCsvData) {
         // Create a CSV string from the allCsvData array
         let csvString = 'Date,Time,Point\n' + allCsvData.join('\n');

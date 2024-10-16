@@ -34,8 +34,18 @@
       background-color: #007bff;
       border-color: #007bff;
     }
-  </style>
+    #spinner {
+  display: none; /* Hidden by default */
+  margin: 20px auto; /* Center horizontally */
+}
 
+    #downloadButton {
+      display: none; /* Hide the download button initially */
+    }
+    form button:not(:last-child){
+      margin-bottom: 1.75rem;
+    }
+  </style>
 </head>
 
 <body>
@@ -72,7 +82,17 @@
       </div>
 
       <!-- Submit button -->
-      <button type="submit" class="btn btn-primary btn-block submit-btn">Submit</button>
+      <button type="submit" class="btn btn-primary btn-block submit-btn">Get Data</button>
+      
+      <!-- Spinner and Download Button -->
+      <!-- Spinner below submit button -->
+      <div id="spinner" class="text-center" style="display: none;">
+        <div class="spinner-border" role="status">
+          <span class="sr-only">Loading...</span>
+        </div>
+      </div>
+
+      <button id="downloadButton" class="btn btn-success btn-block">Download CSV</button>
     </form>
 
     <!-- Output Div -->
@@ -80,5 +100,4 @@
   </div>
 
 </body>
-
 </html>
