@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="https://www.dhm.gov.np/assets/vendors/bootstrap_datepicker/dist/css/bootstrap-datepicker.min.css">
   <script src="https://www.dhm.gov.np/assets/vendors/bootstrap_datepicker/dist/js/bootstrap-datepicker.min.js"></script>
 
+  <!-- main script -->
+  <script src="script.js"></script>
   <style>
     /* Custom styles for form */
     .form-container {
@@ -76,146 +78,6 @@
     <!-- Output Div -->
     <div id="output" class="mt-4"></div>
   </div>
-
-  <script>
-    $(document).ready(function () {
-      // Initialize date picker
-      $('.datePicker').datepicker({
-        format: "yyyy-mm-dd",
-        autoclose: true
-      });
-
-      // Fetch station data and populate the basin and station select dropdowns
-      function loadStations() {
-        $.ajax({
-          url: 'https://www.dhm.gov.np/frontend_dhm/hydrology/getRainfallFilter',
-          type: 'GET',
-          dataType: 'json',
-          success: function (response) {
-            var basinSelect = $('#basin');
-            var stationSelect = $('#station');
-            var stations = response.data[0];  // Assuming data is in response.data[0]
-
-            // Find unique basins
-            var basins = [...new Set(stations.map(station => station.basin))];
-
-            // Populate basin dropdown with unique basins
-            basinSelect.empty();
-            basinSelect.append('<option value="">All Basins</option>');
-            basins.forEach(function (basin) {
-              basinSelect.append('<option value="' + basin + '">' + basin + '</option>');
-            });
-
-            // Function to populate all stations
-            function populateStations(stationsList) {
-              stationSelect.empty();
-              stationSelect.append('<option value="all">All Stations</option>');
-              stationsList.forEach(function (station) {
-                stationSelect.append('<option value="' + station.series_id + '">' + station.name + '</option>');
-              });
-            }
-
-            // Initially populate with all stations
-            populateStations(stations);
-
-            // When a basin is selected, filter stations based on the selected basin
-            basinSelect.on('change', function () {
-              var selectedBasin = $(this).val();
-
-              if (selectedBasin) {
-                // Filter stations belonging to the selected basin
-                var filteredStations = stations.filter(station => station.basin === selectedBasin);
-                populateStations(filteredStations);
-              } else {
-                // Show all stations if no basin is selected
-                populateStations(stations);
-              }
-            });
-          },
-          error: function () {
-            $('#basin').html('<option value="">Failed to load basins</option>');
-            $('#station').html('<option value="">Failed to load stations</option>');
-          }
-        });
-      }
-
-      // Load stations and basins on page load
-      loadStations();
-
-      // Form submission with AJAX
-      $('#rainfallForm').on('submit', function (e) {
-        e.preventDefault();
-
-        var selectedStation = $('#station').val();
-        var dateFrom = $('#date_from').val();
-        var dateTo = $('#date_to').val();
-
-        // Clear the output before new requests
-        $('#output').html('');
-
-        if (new Date(dateFrom) > new Date(dateTo)) {
-          $('#output').html('<p>Invalid date range. "From Date" cannot be after "To Date".</p>');
-          return;
-        }
-
-        // Dates for range (like previous code)
-        function getDatesInRange(startDate, endDate) {
-          var dates = [];
-          var currentDate = new Date(startDate);
-
-          while (currentDate <= new Date(endDate)) {
-            dates.push(currentDate.toISOString().split('T')[0]); // Format the date as yyyy-mm-dd
-            currentDate.setDate(currentDate.getDate() + 1);
-          }
-
-          return dates;
-        }
-
-        var dates = getDatesInRange(dateFrom, dateTo);
-
-        // Check if "All Stations" is selected
-        if (selectedStation === "all") {
-          // All stations selected - iterate over stations first, then dates
-          $('#station option').each(function () {
-            var stationId = $(this).val();
-            var stationName = $(this).text();
-
-            if (stationId !== "all") {  // Exclude "All Stations" option
-              submitForStationAndDates(stationId, stationName, dates);
-            }
-          });
-        } else {
-          // Single station selected
-          var stationName = $('#station option:selected').text();
-          submitForStationAndDates(selectedStation, stationName, dates);
-        }
-      });
-
-      // Function to submit data for each station and date
-      function submitForStationAndDates(stationId, stationName, dates) {
-        dates.forEach(function (date) {
-          var data = {
-            date: date,
-            period: 1,
-            seriesid: stationId
-          };
-
-          $.ajax({
-            type: 'POST',
-            url: 'https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId', // Example URL
-            data: data,
-            success: function (response) {
-              $('#output').append('<p>Data for ' + stationName + ' station on ' + date + ':</p>');
-              $('#output').append('<pre>' + JSON.parse(response).data.table + '</pre>');
-            },
-            error: function () {
-              $('#output').append('<p>Failed to retrieve data for ' + stationName + ' station on ' + date + '.</p>');
-            }
-          });
-        });
-      }
-    });
-  </script>
 
 </body>
 
