@@ -27,7 +27,7 @@ $(document).ready(function() {
     let nepalTimeToday = getNepalTime(345); // Nepal's GMT offset is +5:45 (345 minutes)
     $('#date_from').val(nepalTimeToday);
     $('#date_to').val(nepalTimeToday);
-    
+
     // Fetch station data and populate the basin and station select dropdowns
     function loadStations() {
         $.ajax({
@@ -109,6 +109,7 @@ $(document).ready(function() {
         function getDatesInRange(startDate, endDate) {
             var dates = [];
             var currentDate = new Date(startDate);
+            currentDate.setDate(currentDate.getDate() - 1); // Adjust to include one day before
 
             while (currentDate <= new Date(endDate)) {
                 dates.push(currentDate.toISOString().split('T')[0]); // Format the date as yyyy-mm-dd
@@ -137,7 +138,7 @@ $(document).ready(function() {
 
                     if (stationId !== "all") { // Exclude "All Stations" option
                         // Collect data for this station and date
-                        requests.push(collectDataForStation(stationId, stationName, date, allCsvData));
+                        requests.push(collectDataForStation(stationId, stationName, date, allCsvData, dateFrom, dateTo));
                     }
                 });
             });
@@ -145,13 +146,30 @@ $(document).ready(function() {
             // Single station selected, iterate through all dates
             var stationName = $('#station option:selected').text();
             dates.forEach(function(date) {
-                requests.push(collectDataForStation(selectedStation, stationName, date, allCsvData));
+                requests.push(collectDataForStation(selectedStation, stationName, date, allCsvData, dateFrom, dateTo));
             });
         }
 
         // Wait for all requests to complete
         Promise.all(requests)
             .then(() => {
+                // Sort all CSV data by date and time
+                allCsvData.sort((a, b) => {
+                    // Split into date and time
+                    let [dateA, timeA] = a.split(',')[0].split(',');
+                    let [dateB, timeB] = b.split(',')[0].split(',');
+
+                    // Convert dates to comparable format
+                    let dateComparison = new Date(dateA.split(',').reverse().join('-')) - new Date(dateB.split(',').reverse().join('-'));
+
+                    // If dates are the same, compare by time
+                    if (dateComparison === 0) {
+                        return timeA.localeCompare(timeB); // Compare times
+                    }
+
+                    return dateComparison;
+                });
+
                 // Show the download button after all requests are completed
                 $('#downloadButton').show();
             })
@@ -166,7 +184,7 @@ $(document).ready(function() {
     });
 
     // Function to collect data for each station and date
-    function collectDataForStation(stationId, stationName, date, allCsvData) {
+    function collectDataForStation(stationId, stationName, date, allCsvData, dateFrom, dateTo) {
         return new Promise((resolve, reject) => {
             var data = {
                 date: date,
@@ -198,11 +216,20 @@ $(document).ready(function() {
                         let hours = ("0" + dateObj.getHours()).slice(-2);
                         let minutes = ("0" + dateObj.getMinutes()).slice(-2);
 
-                        // Create the formatted date string
-                        let formattedDate = `${day}${month}${year},${hours}${minutes}`;
+                        // Only compare the date part (ignore time)
+                        let dateOnlyObj = new Date(dateObj);
+                        let dateOnlyFrom = new Date(dateFrom);
+                        let dateOnlyTo = new Date(dateTo);
 
-                        // Push the formatted data into the allCsvData array
-                        allCsvData.push(`${formattedDate},${point}`);
+                        dateOnlyObj.setHours(0, 0, 0, 0); // Reset time to midnight
+                        dateOnlyFrom.setHours(0, 0, 0, 0); // Reset time to midnight
+                        dateOnlyTo.setHours(0, 0, 0, 0); // Reset time to midnight
+
+                        // Only include the data if the date is between "From Date" and "To Date"
+                        if (dateOnlyFrom <= dateOnlyObj && dateOnlyObj <= dateOnlyTo) {
+                            // Push the formatted data into the allCsvData array
+                            allCsvData.push(`${day}${month}${year},${hours}${minutes},${point}`);
+                        }
                     });
 
                     resolve(); // Resolve the promise after data is processed
@@ -245,4 +272,5 @@ $(document).ready(function() {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     }
+
 });
