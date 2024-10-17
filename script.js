@@ -248,6 +248,24 @@ $(document).ready(function() {
     });
 
     function triggerCsvDownload(allCsvData) {
+        // Sort all CSV data by date and time
+        allCsvData.sort((a, b) => {
+            // Split the rows by commas to extract date and time
+            let [dateA, timeA] = a.split(',').slice(0, 2); 
+            let [dateB, timeB] = b.split(',').slice(0, 2); 
+            
+            // Convert dates from ddmmyyyy to yyyy-mm-dd for comparison
+            let formattedDateA = `${dateA.slice(4, 8)}-${dateA.slice(2, 4)}-${dateA.slice(0, 2)}`;
+            let formattedDateB = `${dateB.slice(4, 8)}-${dateB.slice(2, 4)}-${dateB.slice(0, 2)}`;
+            
+            // Create Date objects with time for comparison
+            let dateTimeA = new Date(`${formattedDateA}T${timeA.slice(0, 2)}:${timeA.slice(2, 4)}`);
+            let dateTimeB = new Date(`${formattedDateB}T${timeB.slice(0, 2)}:${timeB.slice(2, 4)}`);
+            
+            // Compare the two Date objects
+            return dateTimeA - dateTimeB;
+        });
+
         // Create a CSV string from the allCsvData array
         let csvString = 'Date,Time,Point\n' + allCsvData.join('\n');
 
