@@ -23,6 +23,7 @@ $(document).ready(function() {
             type: 'GET',
             dataType: 'json',
             success: function(response) {
+                var districtSelect = $('#district');
                 var basinSelect = $('#basin');
                 var stationSelect = $('#station');
                 var stations = response.data[0]; 
@@ -35,6 +36,16 @@ $(document).ready(function() {
                 basinSelect.append('<option value="">All Basins</option>');
                 basins.forEach(function(basin) {
                     basinSelect.append('<option value="' + basin + '">' + basin + '</option>');
+                });
+
+                // Find unique districts
+                var districts = [...new Set(stations.map(station => station.district))];
+
+                // Populate district dropdown
+                districtSelect.empty();
+                districtSelect.append('<option value="">All Districts</option>');
+                districts.forEach(function(district) {
+                    districtSelect.append('<option value="' + district + '">' + district + '</option>');
                 });
 
                 // Populate station dropdown
@@ -53,6 +64,17 @@ $(document).ready(function() {
                     var selectedBasin = $(this).val();
                     if (selectedBasin) {
                         var filteredStations = stations.filter(station => station.basin === selectedBasin);
+                        populateStations(filteredStations);
+                    } else {
+                        populateStations(stations);
+                    }
+                });
+
+                // Filter stations by selected district
+                districtSelect.on('change', function() {
+                    var selectedDistrict = $(this).val();
+                    if (selectedDistrict) {
+                        var filteredStations = stations.filter(station => station.district === selectedDistrict);
                         populateStations(filteredStations);
                     } else {
                         populateStations(stations);
@@ -143,8 +165,9 @@ $(document).ready(function() {
                         let month = ("0" + (dateObj.getMonth() + 1)).slice(-2);
                         let year = dateObj.getFullYear();
                         let hours = ("0" + dateObj.getHours()).slice(-2);
+                        let minutes = ("0" + dateObj.getMinutes()).slice(-2);
 
-                        let csvRow = `${day}${month}${year},${hours},${point}`;
+                        let csvRow = `${day}${month}${year},${hours}${minutes},${point}`;
 
                         // Only compare the date part (ignore time)
                         let dateOnlyObj = new Date(dateObj);

@@ -8,6 +8,11 @@
 
   <!-- Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+  <!-- JSZip Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
   
   <!-- jQuery and Bootstrap Datepicker -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -16,6 +21,8 @@
 
   <!-- main script -->
   <script src="script.js"></script>
+  <!-- <script src="action.js"></script> -->
+  
   <style>
     /* Custom styles for form */
     .form-container {
@@ -73,11 +80,28 @@
         </select>
       </div>
 
+      <!-- District Select dropdown -->
+      <div class="form-group">
+        <label for="district">Select District:</label>
+        <select class="form-control" id="district" name="district">
+          <option value="">All Districts</option>
+        </select>
+      </div>
+
       <!-- Station Select dropdown for Series ID -->
       <div class="form-group">
         <label for="station">Select Station:</label>
         <select class="form-control" id="station" name="seriesid" required>
           <option value="all">All Stations</option>
+        </select>
+      </div>
+      <!-- Resolution Select -->
+      <div class="form-group">
+        <label for="resolution">Select Resolution:</label>
+        <select class="form-control" id="resolution" name="resolution" required>
+          <option value="1">10 minutes</option>
+          <option value="2" selected>Hourly</option>
+          <option value="3" disabled>Daily</option>
         </select>
       </div>
 
@@ -92,7 +116,7 @@
         </div>
       </div>
 
-      <button id="downloadButton" class="btn btn-success btn-block">Download CSV</button>
+      <button id="downloadButton" class="btn btn-success btn-block">Download Data</button>
     </form>
 
     <!-- Output Div -->
