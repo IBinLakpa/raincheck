@@ -179,17 +179,38 @@ $(document).ready(function() {
         let stationNames = Object.keys(stationCsvData);
 
         if (stationNames.length === 1) {
-            let csvData = stationCsvData[stationNames[0]].join('\n');
-            triggerCsvDownload(stationNames[0], csvData);
+            triggerCsvDownload(stationNames[0], stationCsvData[stationNames[0]]);
         } else {
             triggerZipDownload(stationCsvData);
         }
 
     }
 
+    //Sort the CSV data by date and time
+    function sortCSV(csvData){
+        csvData.sort((a, b) => {
+            // Split the rows by commas to extract date and time
+            let [dateA, timeA] = a.split(',').slice(0, 2); 
+            let [dateB, timeB] = b.split(',').slice(0, 2); 
+            
+            // Convert dates from ddmmyyyy to yyyy-mm-dd for comparison
+            let formattedDateA = `${dateA.slice(4, 8)}-${dateA.slice(2, 4)}-${dateA.slice(0, 2)}`;
+            let formattedDateB = `${dateB.slice(4, 8)}-${dateB.slice(2, 4)}-${dateB.slice(0, 2)}`;
+            
+            // Create Date objects with time for comparison
+            let dateTimeA = new Date(`${formattedDateA}T${timeA.slice(0, 2)}:${timeA.slice(2, 4)}`);
+            let dateTimeB = new Date(`${formattedDateB}T${timeB.slice(0, 2)}:${timeB.slice(2, 4)}`);
+            
+            // Compare the two Date objects
+            return dateTimeA - dateTimeB;
+        });
+        return csvData
+    }
+
     // Download a single CSV file
     function triggerCsvDownload(stationName, csvData) {
-        let csvString = 'Date,Time,Point\n' + csvData;
+        let sortedCSVdata = sortCSV(csvData);
+        let csvString = 'Date,Time,Point\n' + sortedCSVdata.join('\n');
         let blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         let link = document.createElement('a');
         let url = URL.createObjectURL(blob);
@@ -206,8 +227,8 @@ $(document).ready(function() {
     function triggerZipDownload(stationCsvData) {
         let zip = new JSZip();
         Object.keys(stationCsvData).forEach(stationName => {
-            let csvData = stationCsvData[stationName].join('\n');
-            let csvString = 'Date,Time,Point\n' + csvData;
+            let csvData = sortCSV(stationCsvData[stationName]);
+            let csvString = 'Date,Time,Point\n' + csvData.join('\n');
             zip.file(stationName + '_rainfall_data.csv', csvString);
         });
 
