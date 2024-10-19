@@ -5,140 +5,110 @@ $(document).ready(function() {
         autoclose: true
     });
 
-    // Function to get Nepal time (GMT +5:45)
+    // Get Nepal time (GMT +5:45)
     function getNepalTime(offsetMinutes) {
-        let now = new Date();
-        let utc = now.getTime() + (now.getTimezoneOffset() * 60000); 
-        return new Date(utc + (offsetMinutes * 60000));
+        const now = new Date();
+        return new Date(now.getTime() + (offsetMinutes - now.getTimezoneOffset()) * 60000);
     }
 
-    let nepalTimeToday = getNepalTime(345);
-    $('#date_from').val(nepalTimeToday.toISOString().split('T')[0]);
-    $('#date_to').val(nepalTimeToday.toISOString().split('T')[0]);
+    const nepalTimeToday = getNepalTime(345);
+    $('#date_from, #date_to').val(nepalTimeToday.toISOString().split('T')[0]);
 
-    // Fetch stations and populate basin and station dropdowns
+    let stations = [];
+
+    // Fetch stations and populate dropdowns
     function loadStations() {
-        $.ajax({
-            url: 'https://www.dhm.gov.np/frontend_dhm/hydrology/getRainfallFilter',
-            type: 'GET',
-            dataType: 'json',
-            success: function(response) {
-                var districtSelect = $('#district');
-                var basinSelect = $('#basin');
-                var stationSelect = $('#station');
-                var stations = response.data[0]; 
-
-                // Find unique basins
-                var basins = [...new Set(stations.map(station => station.basin))];
-
-                // Populate basin dropdown
-                basinSelect.empty();
-                basinSelect.append('<option value="">All Basins</option>');
-                basins.forEach(function(basin) {
-                    basinSelect.append('<option value="' + basin + '">' + basin + '</option>');
-                });
-
-                // Find unique districts
-                var districts = [...new Set(stations.map(station => station.district))];
-
-                // Populate district dropdown
-                districtSelect.empty();
-                districtSelect.append('<option value="">All Districts</option>');
-                districts.forEach(function(district) {
-                    districtSelect.append('<option value="' + district + '">' + district + '</option>');
-                });
-
-                // Populate station dropdown
-                function populateStations(stationsList) {
-                    stationSelect.empty();
-                    stationSelect.append('<option value="all">All Stations</option>');
-                    stationsList.forEach(function(station) {
-                        stationSelect.append('<option value="' + station.series_id + '">' + station.name + '</option>');
-                    });
-                }
-
-                populateStations(stations);
-
-                // Filter stations by selected basin
-                basinSelect.on('change', function() {
-                    var selectedBasin = $(this).val();
-                    if (selectedBasin) {
-                        var filteredStations = stations.filter(station => station.basin === selectedBasin);
-                        populateStations(filteredStations);
-                    } else {
-                        populateStations(stations);
-                    }
-                });
-
-                // Filter stations by selected district
-                districtSelect.on('change', function() {
-                    var selectedDistrict = $(this).val();
-                    if (selectedDistrict) {
-                        var filteredStations = stations.filter(station => station.district === selectedDistrict);
-                        populateStations(filteredStations);
-                    } else {
-                        populateStations(stations);
-                    }
-                });
-            },
-            error: function() {
-                $('#basin').html('<option value="">Failed to load basins</option>');
-                $('#station').html('<option value="">Failed to load stations</option>');
-            }
+        $.getJSON('https://www.dhm.gov.np/frontend_dhm/hydrology/getRainfallFilter', function(response) {
+            stations = response.data[0];
+            populateDropdowns(stations);
+        }).fail(function() {
+            $('#basin, #station').html('<option value="">Failed to load data</option>');
         });
     }
 
-    // Load stations on page load
+    function populateDropdowns(stations) {
+        const basins = [...new Set(stations.map(station => station.basin))];
+        const districts = [...new Set(stations.map(station => station.district))];
+        
+        populateSelect('#basin', basins, 'All Basins');
+        populateSelect('#district', districts, 'All Districts');
+        populateStations(stations);
+
+        $('#basin, #district').on('change', function() {
+            const selectedBasin = $('#basin').val();
+            const selectedDistrict = $('#district').val();
+
+            const filteredStations = stations.filter(station => 
+                (!selectedBasin || station.basin === selectedBasin) && 
+                (!selectedDistrict || station.district === selectedDistrict)
+            );
+
+            populateStations(filteredStations);
+        });
+    }
+
+    function populateSelect(selector, items, placeholder) {
+        const $select = $(selector).empty().append(`<option value="">${placeholder}</option>`);
+        const fragment = document.createDocumentFragment();
+        
+        items.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item;
+            option.textContent = item;
+            fragment.appendChild(option);
+        });
+
+        $select.append(fragment);
+    }
+
+    function populateStations(stationsList) {
+        const $stationSelect = $('#station').empty().append('<option value="all">All Stations</option>');
+        const fragment = document.createDocumentFragment();
+        
+        stationsList.forEach(station => {
+            const option = document.createElement('option');
+            option.value = station.series_id;
+            option.textContent = station.name;
+            fragment.appendChild(option);
+        });
+
+        $stationSelect.append(fragment);
+    }
+
     loadStations();
 
-    // Initialize global object to store CSV data by station
-    let stationCsvData = {};
-
-    // Form submission
+    // Form submission handler
     $('#rainfallForm').on('submit', function(e) {
         e.preventDefault();
-
-        let selectedStation = $('#station').val();
-        let dateFrom = $('#date_from').val();
-        let dateTo = $('#date_to').val();
-        stationCsvData = {}; // Reset station data
-
+        
+        const selectedStation = $('#station').val();
+        const dateFrom = $('#date_from').val();
+        const dateTo = $('#date_to').val();
+        
         if (new Date(dateFrom) > new Date(dateTo)) {
             $('#output').html('<p>Invalid date range.</p>');
             return;
         }
 
-        // Get date range
-        let dates = getDatesInRange(dateFrom, dateTo);
-
-        // Show spinner, hide download button
-        $('#spinner').show();
-        $('#downloadButton').hide();
-
+        const dates = getDatesInRange(dateFrom, dateTo);
         let requests = [];
 
         if (selectedStation === "all") {
             $('#station option').each(function() {
-                let stationId = $(this).val();
-                let stationName = $(this).text();
+                const stationId = $(this).val();
                 if (stationId !== "all") {
-                    dates.forEach(date => {
-                        requests.push(collectDataForStation(stationId, stationName, date, dateFrom, dateTo));
-                    });
+                    requests.push(...dates.map(date => collectDataForStation(stationId, date, dateFrom, dateTo)));
                 }
             });
         } else {
-            let stationName = $('#station option:selected').text();
-            dates.forEach(date => {
-                requests.push(collectDataForStation(selectedStation, stationName, date, dateFrom, dateTo));
-            });
+            requests.push(...dates.map(date => collectDataForStation(selectedStation, date, dateFrom, dateTo)));
         }
 
-        // Wait for all requests to complete
+        $('#spinner').show();
+        $('#downloadButton').hide();
+
         Promise.all(requests).then(() => {
-            // After all data is collected, download files
-            $('#downloadButton').show();
-            $('#downloadButton').on('click', function() {
+            $('#downloadButton').show().one('click', () => {
                 triggerCsvOrZipDownload(stationCsvData);
             });
         }).finally(() => {
@@ -146,129 +116,54 @@ $(document).ready(function() {
         });
     });
 
-    function collectDataForStation(stationId, stationName, date, dateFrom, dateTo) {
+    // Initialize global object to store CSV data by station
+    let stationCsvData = {};
+
+    // Collect data for each station
+    function collectDataForStation(stationId, date, dateFrom, dateTo) {
         return new Promise((resolve, reject) => {
-            $.ajax({
-                type: 'POST',
-                url: 'https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId',
-                data: { date, period: 2, seriesid: stationId },
-                success: function(response) {
-                    let tableHTML = JSON.parse(response).data.table;
-                    let tempDiv = $('<div>').html(tableHTML);
+            $.post('https://www.dhm.gov.np/hydrology/getRainfallWatchBySeriesId', {
+                date, period: 2, seriesid: stationId
+            }, function(response) {
+                const tableHTML = JSON.parse(response).data.table;
+                const tempDiv = $('<div>').html(tableHTML);
 
-                    tempDiv.find('tbody tr').each(function() {
-                        let dateText = $(this).find('td').eq(0).text().trim();
-                        let point = $(this).find('td').eq(1).text().trim();
+                tempDiv.find('tbody tr').each(function() {
+                    const dateText = $(this).find('td').eq(0).text().trim();
+                    const point = $(this).find('td').eq(1).text().trim();
 
-                        let dateObj = new Date(dateText);
-                        let day = ("0" + dateObj.getDate()).slice(-2);
-                        let month = ("0" + (dateObj.getMonth() + 1)).slice(-2);
-                        let year = dateObj.getFullYear();
-                        let hours = ("0" + dateObj.getHours()).slice(-2);
-                        let minutes = ("0" + dateObj.getMinutes()).slice(-2);
+                    const dateObj = new Date(dateText);
+                    const csvRow = formatCSVRow(dateObj, point);
 
-                        let csvRow = `${day}${month}${year},${hours}${minutes},${point}`;
+                    if (!stationCsvData[stationId]) stationCsvData[stationId] = [];
+                    if (isDateInRange(dateObj, dateFrom, dateTo)) stationCsvData[stationId].push(csvRow);
+                });
 
-                        // Only compare the date part (ignore time)
-                        let dateOnlyObj = new Date(dateObj);
-                        let dateOnlyFrom = new Date(dateFrom);
-                        let dateOnlyTo = new Date(dateTo);
-
-                        dateOnlyObj.setHours(0, 0, 0, 0); // Reset time to midnight
-                        dateOnlyFrom.setHours(0, 0, 0, 0); // Reset time to midnight
-                        dateOnlyTo.setHours(0, 0, 0, 0); // Reset time to midnight
-
-                        // Add data to the corresponding station's CSV data
-                        if (!stationCsvData[stationName]) {
-                            stationCsvData[stationName] = [];
-                        }
-                        if (dateOnlyFrom <= dateOnlyObj && dateOnlyObj <= dateOnlyTo){
-                            stationCsvData[stationName].push(csvRow);
-                        }
-                    });
-
-                    resolve();
-                },
-                error: function() {
-                    $('#output').append('<p>Failed to retrieve data for ' + stationName + ' on ' + date + '.</p>');
-                    resolve();
-                }
+                resolve();
+            }).fail(() => {
+                $('#output').append(`<p>Failed to retrieve data for station ${stationId} on ${date}.</p>`);
+                resolve();
             });
         });
     }
 
-    // Trigger CSV or ZIP download depending on the number of stations
-    function triggerCsvOrZipDownload(stationCsvData) {
-        let stationNames = Object.keys(stationCsvData);
-
-        if (stationNames.length === 1) {
-            triggerCsvDownload(stationNames[0], stationCsvData[stationNames[0]]);
-        } else {
-            triggerZipDownload(stationCsvData);
-        }
-
+    // Helper functions
+    function formatCSVRow(dateObj, point) {
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = dateObj.getFullYear();
+        const hours = String(dateObj.getHours()).padStart(2, '0');
+        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+        return `${day}${month}${year},${hours}${minutes},${point}`;
     }
 
-    //Sort the CSV data by date and time
-    function sortCSV(csvData){
-        csvData.sort((a, b) => {
-            // Split the rows by commas to extract date and time
-            let [dateA, timeA] = a.split(',').slice(0, 2); 
-            let [dateB, timeB] = b.split(',').slice(0, 2); 
-            
-            // Convert dates from ddmmyyyy to yyyy-mm-dd for comparison
-            let formattedDateA = `${dateA.slice(4, 8)}-${dateA.slice(2, 4)}-${dateA.slice(0, 2)}`;
-            let formattedDateB = `${dateB.slice(4, 8)}-${dateB.slice(2, 4)}-${dateB.slice(0, 2)}`;
-            
-            // Create Date objects with time for comparison
-            let dateTimeA = new Date(`${formattedDateA}T${timeA.slice(0, 2)}:${timeA.slice(2, 4)}`);
-            let dateTimeB = new Date(`${formattedDateB}T${timeB.slice(0, 2)}:${timeB.slice(2, 4)}`);
-            
-            // Compare the two Date objects
-            return dateTimeA - dateTimeB;
-        });
-        return csvData
+    function isDateInRange(dateObj, dateFrom, dateTo) {
+        const startDate = new Date(dateFrom);
+        const endDate = new Date(dateTo);
+        dateObj.setHours(0, 0, 0, 0);  // Normalize time for comparison
+        return dateObj >= startDate && dateObj <= endDate;
     }
 
-    // Download a single CSV file
-    function triggerCsvDownload(stationName, csvData) {
-        let sortedCSVdata = sortCSV(csvData);
-        let csvString = 'Date,Time,Point\n' + sortedCSVdata.join('\n');
-        let blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-        let link = document.createElement('a');
-        let url = URL.createObjectURL(blob);
-
-        link.setAttribute('href', url);
-        link.setAttribute('download', stationName + '_rainfall_data.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    }
-
-    // Create and download a ZIP file containing multiple CSV files
-    function triggerZipDownload(stationCsvData) {
-        let zip = new JSZip();
-        Object.keys(stationCsvData).forEach(stationName => {
-            let csvData = sortCSV(stationCsvData[stationName]);
-            let csvString = 'Date,Time,Point\n' + csvData.join('\n');
-            zip.file(stationName + '_rainfall_data.csv', csvString);
-        });
-
-        zip.generateAsync({ type: 'blob' }).then(function(content) {
-            let link = document.createElement('a');
-            let url = URL.createObjectURL(content);
-
-            link.setAttribute('href', url);
-            link.setAttribute('download', 'rainfall_data.zip');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        });
-    }
-
-    // Get all dates in a range
     function getDatesInRange(startDate, endDate) {
         let dates = [];
         let currentDate = new Date(startDate);
@@ -279,5 +174,62 @@ $(document).ready(function() {
             currentDate.setDate(currentDate.getDate() + 1);
         }
         return dates;
+    }
+
+    function triggerCsvOrZipDownload(stationCsvData) {
+        const stationNames = Object.keys(stationCsvData);
+        if (stationNames.length === 1) {
+            triggerCsvDownload(stationNames[0], stationCsvData[stationNames[0]]);
+        } else {
+            triggerZipDownload(stationCsvData);
+        }
+    }
+
+    function triggerCsvDownload(stationName, csvData) {
+        const sortedCSVdata = sortCSV(csvData);
+        const blob = new Blob([sortedCSVdata], { type: 'text/plain;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.href = url;
+        link.download = `${stationName}_rainfall_data.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function triggerZipDownload(stationCsvData) {
+        const zip = new JSZip();
+        Object.keys(stationCsvData).forEach(stationName => {
+            const csvData = sortCSV(stationCsvData[stationName]);
+            zip.file(`${stationName}_rainfall_data.txt`, csvData);
+        });
+
+        zip.generateAsync({ type: 'blob' }).then(content => {
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(content);
+
+            link.href = url;
+            link.download = 'rainfall_data.zip';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // Sorting and unique filtering for CSV data
+    function sortCSV(csvData) {
+        const sortedData = csvData.sort((a, b) => {
+            const [dateA, timeA] = a.split(',').slice(0, 2);
+            const [dateB, timeB] = b.split(',').slice(0, 2);
+            const formattedDateA = `${dateA.slice(4, 8)}-${dateA.slice(2, 4)}-${dateA.slice(0, 2)}`;
+            const formattedDateB = `${dateB.slice(4, 8)}-${dateB.slice(2, 4)}-${dateB.slice(0, 2)}`;
+            return new Date(`${formattedDateA}T${timeA.slice(0, 2)}:${timeA.slice(2, 4)}`) - 
+                   new Date(`${formattedDateB}T${timeB.slice(0, 2)}:${timeB.slice(2, 4)}`);
+        });
+
+        return Array.from(new Set(sortedData.map(row => row))).join('\n'); // Remove duplicates
     }
 });
